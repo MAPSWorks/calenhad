@@ -1,21 +1,18 @@
 #version 430
-
+layout(local_size_x = 32, local_size_y = 32) in;
 layout (rgba32f, binding = 0) uniform image2D destTex;          // output texture
 layout (binding = 1) uniform sampler2DArray rasters;            // array of input textures for modules that require them
-layout (std430, binding = 2) buffer colorMapBuffer { vec4 color_map_out []; };
+layout (std430, binding = 2) buffer colorMapBuffer { vec4 color_map_in []; };
 layout (std430, binding = 3) buffer heightMapBuffer { float height_map_out []; };
-
-layout (local_size_x = 32, local_size_y = 32) in;
+layout (std430, binding = 4) buffer vertexBuffer { vec4 vertices []; };
 
 uniform int altitudeMapBufferSize;
 uniform int colorMapBufferSize;
 uniform int imageHeight = 512;
+uniform int insetHeight = 64;
 
 // first element is the datum longitude, second element is the datum latitude, third element is the scale
 uniform vec3 datum;
-
-// first element is the tile x coordinate, second element is the tile y coordinate, third element is the tile size
-uniform ivec3 tile;
 
 // mathematical constants
 #define M_PI 3.1415926535898
@@ -50,17 +47,17 @@ const int PROJ_ORTHOGRAPHIC = 2;
 //...
 
 // selected projection for main map
+// this is ignored for the inset pass, which is always equirectnagular
 uniform int projection = PROJ_ORTHOGRAPHIC;
 
-// overview map inset parameters
-uniform int insetHeight;                                // height (pixels) - width will be 2 x height - 0 means no inset
-uniform vec4 insetBorder = vec4 (1.0, 1.0, 1.0, 1.0);   // border color
 
-// pass identifiers
-uniform int pass;
-const int PASS_INSET = 1;
-const int PASS_MAINMAP = 2;
-const int PASS_STATISTICS = 3;
+// output identifiers
+const int MODE_PREVIEW = 0;
+const int MODE_OVERVIEW = 1;
+const int MODE_GLOBE = 2;
+const int MODE_VERTEXLIST = 3;
+
+uniform int mode = MODE_GLOBE;
 
 // statistics
 int hypsographyResolution;
@@ -70,6 +67,8 @@ float maxAltitude = 0;
 // raster buffer parameters
 uniform int rasterResolution;                                      // number of elements in a raster = resolution * resolution * 2
 
+// icosphere parameters
+uniform int vertexCount;
 
 vec4 toCartesian (in vec3 geolocation) { // x = longitude, y = latitude
     vec4 cartesian;
@@ -747,8 +746,8 @@ vec4 findColor (float value) {
     int index0 = clamp (indexPos    , 0, colorMapBufferSize - 1);
     int index1 = clamp (indexPos + 1, 0, colorMapBufferSize - 1);
     ivec2 pos = ivec2 (gl_GlobalInvocationID.xy);
-    vec4 out0 = color_map_out [index0 / 4];
-    vec4 out1 = color_map_out [index1 / 4];
+    vec4 out0 = color_map_in [index0 / 4];
+    vec4 out1 = color_map_in [index1 / 4];
     float alpha = (index - index0) / (index1 - index0);
     return mix (vec4 (out0.xyz, 1.0), vec4 (out1.xyz, 1.0), alpha);
 }
@@ -763,24 +762,30 @@ vec4 findColor (float value) {
 //      cartesian - the point in 3D space corresponding to a geolocation on the surface of the (spherical) geoid. -1 <= x, y, z <= 1 and x^2 + y^2 + z^2 = 1.
 
 // Returns the map coordinates for a given GlobalInvocationID (essentially screen coordinates) taking into account the scale.
-// Coordinates returned are those for the inset map (inset TRUE) or the main map (inset FALSE).
 vec2 mapPos (vec2 pos, bool inset) {
-    float r = float (inset ? insetHeight : imageHeight);
-    vec2 j = vec2 ((pos.x - r) / (r * 2), (pos.y / 2 - (r / 4)) / r);
+    float h = (inset ? insetHeight : imageHeight);
+    vec2 j = vec2 ((pos.x - h) / (h * 2), (pos.y / 2 - (h / 4)) / h);
     j *= M_PI * 2;
-    j *= inset ? 1.0 : datum.z;
+    if (! inset) { j *= datum.z; }
     return j;
 }
 
+vec2 mapPos (vec2 pos) {
+    return mapPos (pos, false);
+}
+
 // Returns the screen coordinates (GlobalInvocationID) for given map coordinates taking into account the scale.
-// Coordinates returned are those for the inset map (inset TRUE) or the main map (inset FALSE).
+
 ivec2 scrPos (vec2 g, bool inset) {
-    float r = float (inset ? insetHeight : imageHeight);
     vec2 j = g / (inset ? 1.0 : datum.z);
     j /= M_PI;
-    j.x = (j.x + 1) * r;
-    j.y = (j.y + 0.5) * r;
+    j.x = (j.x + 1) * (inset ? insetHeight : imageHeight);
+    j.y = (j.y + 0.5) * (inset ? insetHeight : imageHeight);
     return ivec2 (j);
+}
+
+ivec2 scrPos (vec2 g) {
+    return scrPos (g, false);
 }
 
     // Projections.
@@ -792,11 +797,11 @@ ivec2 scrPos (vec2 g, bool inset) {
     // centre of projection. Logic here should be identical to that in the corresponding implementations of
     // calenhad::mapping::projection::Projection::forward.
 
-vec3 forward (vec2 g, bool inset) {
+vec3 forward (vec2 g) {
 
-    // use the set values for the inset when we are accessing the inset, otherwise the reigning parameters for the main map.
-    int p = inset ? PROJ_EQUIRECTANGULAR : projection;
-    vec2 d = inset ? vec2 (0.0, 0.0) : datum.xy;
+    int p = projection;
+    vec2 d = datum.xy;
+
 
     // inserted forward //
 
@@ -809,11 +814,11 @@ vec3 forward (vec2 g, bool inset) {
 // centre of projection. Logic here should be identical to that in the corresponding implementations of
 // calenhad::mapping::projection::Projection::inverse.
 
-vec3 inverse (vec2 i, bool inset) {
+vec3 inverse (vec2 i) {
 
     // use the set values for the inset when we are composing the inset, otherwise the reigning parameters for the main map.
-    int p = inset ? PROJ_EQUIRECTANGULAR : projection;
-    vec2 d = inset ? vec2 (0.0, 0.0) : datum.xy;
+    int p = projection;
+    vec2 d = datum.xy;
 
     // inserted inverse //
 
@@ -821,51 +826,61 @@ vec3 inverse (vec2 i, bool inset) {
 
 }
 
-bool inInset (ivec2 pos) {
-    return pos.x < insetHeight * 2 && pos.y < insetHeight;
-}
-
 vec4 toGreyscale (vec4 color) {
     float l = sqrt (color.x * color.x + color.y * color.y + color.z * color.z);
     return vec4 (l, l, l, 1.0);
 }
 
+
 void main() {
 
-    ivec2 pos = ivec2 (gl_GlobalInvocationID.yx);
-    pos += tile.z * tile.xy;
-    bool inset = inInset (pos);
-    vec2 i = mapPos (pos, inset);
-
-    vec3 g = inverse (i, inset);
-    vec4 c = toCartesian (g);
-    vec4 color;
-
-    // this provides some antialiasing at the rim of the globe by fading to dark blue over the outermost 1% of the radius
-    float pets = smoothstep (0.99, 1.00001, abs (c.w));
-    float v = value (c.xyz, g.xy);
-    color = findColor (v);
-    color = mix (color, vec4 (0.0, 0.0, 0.1, 1.0), pets);
-
-    if (insetHeight > 0) {
-        if (inset) {
-            vec3 f = forward (g.xy, false);                                             // get the geolocation of this texel in the inset map
-            ivec2 s = scrPos (f.xy, false);                                             // find the corresponding texel in the main map
-            if (f.z > 1.0 || f.z < 0.0 ||                                               // if the texel is out of the projection's  bounds or ...
-                s.x < 0 || s.x > imageHeight * 2  || s.y < 0 || s.y > imageHeight) {      // if the texel is not on the main map ...
-                color = toGreyscale (findColor (v));                                       // ... grey out the corresponding texel in the inset map.
-            }
-
-            // test functions with output in inset map here if needed
-
-            // get the value "behind" the inset for the benefit of the downloadable height map
-            i = mapPos (pos, false);
-            g = inverse (i, false);
-            c = toCartesian (g);
-            v = value (c.xyz, g.xy);
+    if (mode == MODE_VERTEXLIST) {
+        // compute values for a list of vertices provided in the vertices buffer. In that buffer x, y and z elements are the Cartesian positions
+        // of the vertices and when we compute the value for the vertex we write it to the w element.
+        uint index = gl_GlobalInvocationID.x * 1024 + gl_GlobalInvocationID.y * 32 + gl_GlobalInvocationID.z;
+        if (index < vertexCount) {
+            vec3 pos = vertices [index].xyz;
+            vec2 g = toGeolocation (pos);
+            vertices [index].w = value (pos.xyz, g.xy);
         }
     }
 
-    imageStore (destTex, pos, color);
-    height_map_out [pos.y * imageHeight * 2 + pos.x] = v;
+    if (mode == MODE_GLOBE) {
+
+        ivec2 pos = ivec2 (gl_GlobalInvocationID.yx);
+        vec2 i = mapPos (pos);
+        vec3 g = inverse (i);
+        vec4 c = toCartesian (g);
+        vec4 color;
+
+        // this provides some antialiasing at the rim of the globe by fading to dark blue over the outermost 1% of the radius
+        float pets = smoothstep (0.99, 1.00001, abs (c.w));
+        float v = value (c.xyz, g.xy);
+        color = findColor (v);
+        color = mix (color, vec4 (0.0, 0.0, 0.1, 1.0), pets);
+
+        imageStore (destTex, pos, color);
+        height_map_out [pos.y * imageHeight * 2 + pos.x] = v;
+    }
+
+    if (mode == MODE_OVERVIEW || mode == MODE_PREVIEW) {
+        ivec2 pos = ivec2 (gl_GlobalInvocationID.yx);
+        vec2 i = mapPos (pos, mode == MODE_OVERVIEW);
+        vec3 g = vec3 (i.xy, 1.0); //nverse (i);
+        vec4 c = toCartesian (g);
+        vec4 color;
+        float v = value (c.xyz, g.xy);
+        color = findColor (v);
+
+        if (mode == MODE_OVERVIEW) {
+            vec3 f = forward (i);                                                   // get the geolocation of this texel in the inset map
+            ivec2 s = scrPos (f.xy);                                                // find the corresponding texel in the main map
+            if (f.z > 1.0 || f.z < 0.0 ||                                           // if the texel is out of the projection's  bounds or ...
+            s.x < 0 || s.x > imageHeight * 2  || s.y < 0 || s.y > imageHeight) {    // if the texel is not on the main map ...
+                color = toGreyscale (findColor (v));                                // ... grey out the corresponding texel in the inset map.
+            }
+        }
+        imageStore (destTex, pos, color);
+    }
+
 }

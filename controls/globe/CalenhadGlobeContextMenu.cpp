@@ -3,7 +3,7 @@
 //
 
 #include "CalenhadGlobeContextMenu.h"
-#include "CalenhadGlobeDialog.h"
+#include "CalenhadGlobeWidget.h"
 #include "CalenhadServices.h"
 #include "../../mapping/projection/ProjectionService.h"
 #include "../../mapping/projection/Projection.h"
@@ -12,7 +12,7 @@ using namespace calenhad::controls::globe;
 using namespace calenhad::mapping;
 using namespace calenhad::mapping::projection;
 
-CalenhadGlobeContextMenu::CalenhadGlobeContextMenu (CalenhadGlobeDialog* parent) : QMenu(), _parent (parent) {
+CalenhadGlobeContextMenu::CalenhadGlobeContextMenu (CalenhadGlobeWidget* parent) : QMenu(), _parent (parent) {
 
     _showOverviewMapAction = new QAction ("Overview map", this);
     _showOverviewMapAction->setStatusTip ("Toggle the display of the overview map");
@@ -44,26 +44,6 @@ CalenhadGlobeContextMenu::CalenhadGlobeContextMenu (CalenhadGlobeDialog* parent)
     _showGraticuleAction->setCheckable (true);
     addAction (_showGraticuleAction);
     connect (_showGraticuleAction, SIGNAL (toggled (bool)), this, SIGNAL (showGraticule (const bool&)));
-
-    _qualityMenu = new QMenu ("Render quality", this);
-    _qualityBestAction = new QAction ("Best");
-    _qualityBestAction -> setCheckable (true);
-    _qualityDecentAction = new QAction ("Decent");
-    _qualityDecentAction -> setCheckable (true);
-    _qualityDecentAction -> setChecked (true);
-    _qualityDraftAction = new QAction ("Draft");
-    _qualityDraftAction -> setCheckable (true);
-    _qualityShiteAction = new QAction ("Shite");
-    _qualityShiteAction -> setCheckable (true);
-    connect (_qualityBestAction, &QAction::triggered, this, &CalenhadGlobeContextMenu::selectQuality);
-    connect (_qualityDecentAction, &QAction::triggered, this, &CalenhadGlobeContextMenu::selectQuality);
-    connect (_qualityDraftAction, &QAction::triggered, this, &CalenhadGlobeContextMenu::selectQuality);
-    connect (_qualityShiteAction, &QAction::triggered, this, &CalenhadGlobeContextMenu::selectQuality);
-    _qualityMenu -> addAction (_qualityBestAction);
-    _qualityMenu -> addAction (_qualityDecentAction);
-    _qualityMenu -> addAction (_qualityDraftAction);
-    _qualityMenu -> addAction (_qualityShiteAction);
-    addMenu (_qualityMenu);
 
     // Configure actions for double-clicking with the mouse
 
@@ -152,7 +132,7 @@ CalenhadGlobeContextMenu::CalenhadGlobeContextMenu (CalenhadGlobeDialog* parent)
     _captureMenu = new QMenu ("Capture", this);
     QAction* _captureGreyscaleAction = new QAction ("Export heightmap", this);
     _captureGreyscaleAction -> setToolTip ("Generate a heightmap map and save");
-    connect (_captureGreyscaleAction, &QAction::triggered, _parent, &CalenhadGlobeDialog::captureGreyscale);
+    connect (_captureGreyscaleAction, &QAction::triggered, _parent, &CalenhadGlobeWidget::captureGreyscale);
     _captureMenu -> addAction (_captureGreyscaleAction);
     addMenu (_captureMenu);
 
@@ -171,7 +151,7 @@ CalenhadGlobeContextMenu::CalenhadGlobeContextMenu (CalenhadGlobeDialog* parent)
     configureAction -> setStatusTip ("Configure properties for the globe");
     configureAction -> setCheckable (false);
     addAction (configureAction);
-    connect (configureAction, &QAction::triggered, parent, &CalenhadGlobeDialog::showConfigDialog);
+    connect (configureAction, &QAction::triggered, parent, &CalenhadGlobeWidget::showConfigDialog);
 
 
 }
@@ -211,11 +191,7 @@ void CalenhadGlobeContextMenu::initialise () {
     _gotoAction -> setChecked (_parent -> globe() ->  mouseDoubleClickMode () == CalenhadGlobeDoubleClickMode::Goto);
     _placeAction -> setChecked (_parent -> globe() -> mouseDoubleClickMode () == CalenhadGlobeDoubleClickMode::Place);
     _disableDoubleClickAction -> setChecked (_parent -> globe() -> mouseDoubleClickMode () == CalenhadGlobeDoubleClickMode::NoDoubleClick);
-    RenderQuality quality = _parent -> globe() -> renderQuality();
-    _qualityShiteAction -> setChecked (quality == RenderQuality::RenderQualityShite);
-    _qualityDraftAction -> setChecked (quality == RenderQuality::RenderQualityDraft);
-    _qualityDecentAction -> setChecked (quality == RenderQuality::RenderQualityDecent);
-    _qualityBestAction -> setChecked (quality == RenderQuality::RenderQualityBest);
+
    /* QMap<QString, Projection> m = CalenhadServices::projections() -> all();
     for (QAction* action : _projectionActions -> actions()) {
         Projection p = _parent -> projection();
@@ -233,15 +209,3 @@ void CalenhadGlobeContextMenu::projectionSelected (const bool& selected) {
     }
 }
 
-void CalenhadGlobeContextMenu::selectQuality () {
-    RenderQuality quality = RenderQuality::RenderQualityShite;
-    _qualityShiteAction -> setChecked (false);
-    _qualityDecentAction -> setChecked (false);
-    _qualityDraftAction -> setChecked (false);
-    _qualityBestAction -> setChecked (false);
-    ((QAction*) sender()) -> setChecked (true);
-    if (sender() == _qualityBestAction) { quality = RenderQuality::RenderQualityBest; }
-    if (sender() == _qualityDecentAction) { quality = RenderQuality::RenderQualityDecent; }
-    if (sender() == _qualityDraftAction) { quality = RenderQuality::RenderQualityDraft; }
-    _parent -> globe() -> setRenderQuality (quality);
-}

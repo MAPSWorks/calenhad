@@ -42,7 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #include "../CalenhadServices.h"
 #include "controls/QIconPalette.h"
 #include "../exprtk/VariablesDialog.h"
-#include "qmodule/Node.h"
+#include "module/Node.h"
 #include "../legend/LegendService.h"
 #include "Connection.h"
 #include "NodeBlock.h"
@@ -59,7 +59,7 @@ using namespace calenhad;
 using namespace calenhad::controls;
 using namespace calenhad::nodeedit;
 using namespace calenhad::pipeline;
-using namespace calenhad::qmodule;
+using namespace calenhad::module;
 using namespace calenhad::legend;
 using namespace calenhad::expressions;
 using namespace calenhad::notification;
@@ -422,7 +422,7 @@ void Calenhad::setModel (CalenhadModel* model) {
     _controller-> setModel (_model);
     _model -> setController (_controller);
     _view -> setController (_controller);
-    _view -> setScene (_model);
+    _view -> setModel (_model);
     _controller -> addView (_view);
     connect (_view, &CalenhadView::viewZoomed, this, &Calenhad::updateZoomActions);
     connect (_model, &CalenhadModel::titleChanged, this, &Calenhad::titleChanged);
@@ -740,8 +740,6 @@ void Calenhad::fixScrollBars() {
     _view -> horizontalScrollBar()->setPageStep(areaSize.width());
     _view -> verticalScrollBar()->setRange(0, widgetSize.height() - areaSize.height());
     _view -> horizontalScrollBar()->setRange(0, widgetSize.width() - areaSize.width());
-    //_view -> updateWidgetPosition();
-
 }
 
 void Calenhad::toggleMouseMode () {

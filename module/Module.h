@@ -16,6 +16,7 @@
 #include <memory>
 #include <QtWidgets/QCheckBox>
 #include <mapping/CalenhadMapWidget.h>
+#include <controls/globe/CalenhadGlobeDialog.h>
 #include "Node.h"
 
 
@@ -31,12 +32,11 @@ namespace calenhad {
     namespace controls {
         class QColoredIcon;
         namespace globe {
-            class CalenhadMapView;
             class CalenhadGlobeDialog;
             class CalenhadStatsPanel;
         }
     }
-    namespace qmodule {
+    namespace module {
         class Module : public Node {
         Q_OBJECT
 
@@ -45,7 +45,7 @@ namespace calenhad {
             Q_ENUMS (ModuleType)
 
         public:
-            Module (const QString& nodeType, const bool& suppressRender = false, QWidget* parent = 0);
+            Module (const QString& nodeType, QWidget* parent = nullptr);
             virtual ~Module ();
             QString label();
             QString description();
@@ -77,12 +77,12 @@ namespace calenhad {
             void addPort (calenhad::nodeedit::Port* port, const unsigned& index = 0);
             void suppressRender (bool suppress);
             bool renderSuppressed ();
-
+            float* vertexBuffer();
             QVector<nodeedit::Port*> ports ();
         public slots:
             void setupPreview ();
             void showGlobe ();
-            void rendered (const bool& success);
+            void rendered();
             void parameterChanged() override;
             void invalidate() override;
         protected:
@@ -103,7 +103,7 @@ namespace calenhad {
             QVector<calenhad::nodeedit::Port*> _ports;
             calenhad::nodeedit::Port* _output;
             QMap<unsigned, calenhad::nodeedit::Port*> _inputs;
-
+            float* _vertexBuffer;
             int _statsIndex;
             QDialog* _stats;
 

@@ -5,31 +5,27 @@
 #include "../nodeedit/CalenhadView.h"
 #include "nodeedit/Connection.h"
 #include "nodeedit/NodeBlock.h"
-#include "qmodule/NodeGroup.h"
+#include "module/NodeGroup.h"
 #include "icosphere/icosphere.h"
 #include "../pipeline/ModuleFactory.h"
 #include "../actions/XmlCommand.h"
 #include "nodeedit/Port.h"
-#include "qmodule/Module.h"
+#include "module/Module.h"
 #include "exprtk/Calculator.h"
 #include <QGraphicsSceneMouseEvent>
 #include <actions/ContextAction.h>
-#include "../legend/Legend.h"
 #include "../legend/LegendService.h"
-#include "../preferences/PreferencesService.h"
 #include <QList>
-#include <actions/XmlCommand.h>
 #include <QGraphicsItem>
 #include <QtGui/QGuiApplication>
 #include <QClipboard>
-#include <stdio.h>
-#include "../nodeedit/CalenhadView.h"
+
 
 using namespace icosphere;
 using namespace calenhad;
 using namespace calenhad::pipeline;
 using namespace calenhad::nodeedit;
-using namespace calenhad::qmodule;
+using namespace calenhad::module;
 using namespace calenhad::actions;
 using namespace calenhad::expressions;
 using namespace calenhad::preferences;
@@ -53,11 +49,14 @@ CalenhadModel::CalenhadModel() : QGraphicsScene(),
     _filename (""),
     _undoEnabled (true),
     _lastSaved (QDateTime::currentDateTime()) {
+    CalenhadServices::provideIcosphere (7);
     installEventFilter (this);
     connect (CalenhadServices::legends(), &LegendService::commitRequested, this, &CalenhadModel::commitLegends);
     connect (CalenhadServices::legends(), &LegendService::rollbackRequested, this, &CalenhadModel::rollbackLegends);
     _connectMenu = new QMenu();
     _connectSubMenu = new QMenu (_connectMenu);
+    int extent = CalenhadServices::preferences() -> calenhad_model_extent;
+    setSceneRect (-extent, -extent, extent, extent);
 
     // Load legends from default legends file
     QString file = CalenhadServices::preferences() -> calenhad_legends_filename;
@@ -71,10 +70,16 @@ CalenhadModel::~CalenhadModel() {
     for (Node* n : nodes()) {
         n -> blockSignals (true);
     }
-    if (_menu) { delete _menu; }
-    for (NodeGroup* group : _groups) {
-        delete group;
+
+    for (Connection* c : connections()) {
+        delete c;
     }
+
+    for (Node* n : nodes()) {
+        delete n;
+    }
+
+    if (_menu) { delete _menu; }
 }
 
 // determine whether connection from given input to given output is allowed
@@ -317,7 +322,7 @@ bool CalenhadModel::eventFilter (QObject* o, QEvent* e) {
         }
         case QEvent::GraphicsSceneMouseMove: {
 
-            setSceneRect (sceneRect().united (views() [0] -> visibleRegion().boundingRect()));
+            //setSceneRect (sceneRect().united (views() [0] -> visibleRegion().boundingRect()));
             
 
             // if we moved off a port, set it back to its ordinary style
@@ -521,7 +526,7 @@ QList<Node*> CalenhadModel::nodes() {
 }
 
 
-QList<calenhad::qmodule::Module*> CalenhadModel::modules () {
+QList<calenhad::module::Module*> CalenhadModel::modules () {
     QList<Node*> list = nodes();
     QList<Module*> result;
     for (Node* n : list) {
@@ -628,7 +633,7 @@ QDomDocument CalenhadModel::serialize (const CalenhadFileType& fileType) {
         QDomElement modelElement = doc.createElement ("model");
         root.appendChild (modelElement);
 
-        // serialize top-level nodes
+        // serialize top-_level nodes
         // each group found will serialize its contents recursively
         QDomElement nodesElement = doc.createElement ("nodes");
         modelElement.appendChild (nodesElement);
@@ -1085,7 +1090,7 @@ void CalenhadModel::createConnection (Port* from, Port* to) {
     }
 }
 
-void CalenhadModel::doDuplicateNode (calenhad::qmodule::Node* node) {
+void CalenhadModel::doDuplicateNode (calenhad::module::Node* node) {
     preserve();
     Node* copy = node -> clone();
     QPointF p (node -> handle() -> pos());

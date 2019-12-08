@@ -22,19 +22,18 @@ namespace calenhad {
     namespace controls {
         namespace globe {
 
-            class CalenhadGlobeDialog;
+            class CalenhadGlobeWidget;
 
             class CalenhadGlobeContextMenu : public QMenu {
             Q_OBJECT
             public:
-                CalenhadGlobeContextMenu (CalenhadGlobeDialog* parent);
+                CalenhadGlobeContextMenu (CalenhadGlobeWidget* parent);
 
                 virtual ~CalenhadGlobeContextMenu ();
 
             public slots:
 
                 void setDragMode (const bool& enable);
-                void selectQuality();
 
             signals:
 
@@ -55,7 +54,7 @@ namespace calenhad {
                 void scaleVisibleSelected (const bool&);
 
             protected:
-                CalenhadGlobeDialog* _parent;
+                CalenhadGlobeWidget* _parent;
                 QMenu* _mouseDragMenu;
                 QAction* _panAction;
                 QAction* _zoomAction;
@@ -72,8 +71,6 @@ namespace calenhad {
                 QMenu* _projectionMenu;
                 QActionGroup* _projectionActions;
                 QMenu* _captureMenu;
-                QMenu* _qualityMenu;
-                QAction* _qualityBestAction, * _qualityDecentAction, * _qualityDraftAction, * _qualityShiteAction;
 
             protected slots:
 

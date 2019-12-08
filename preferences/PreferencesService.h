@@ -125,12 +125,14 @@ namespace calenhad {
             double calenhad_desktop_nodegroup_height_default;
             double calenhad_desktop_nodegroup_width_default;
             double calenhad_model_extent;
+            int calenhad_icosphere_depth;
 
             // Modules
 
             QString calenhad_module_icospheremap;
             QString calenhad_module_altitudemap;
             QString calenhad_module_raster;
+            QString calenhad_module_raster_file;
             QString calenhad_nodegroup;
             QColor calenhad_toolpalette_icon_color_normal;
             QColor calenhad_toolpalette_icon_color_mouseover;

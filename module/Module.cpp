@@ -5,7 +5,7 @@
 
 #include "Module.h"
 #include "nodeedit/NodeBlock.h"
-#include "../qmodule/NodeGroup.h"
+#include "../module/NodeGroup.h"
 #include "nodeedit/Port.h"
 #include "../nodeedit/Calenhad.h"
 #include "../pipeline/CalenhadModel.h"
@@ -14,15 +14,18 @@
 #include "../legend/Legend.h"
 #include "../pipeline/ModuleFactory.h"
 #include <QDialogButtonBox>
-#include <controls/globe/CalenhadGlobeDialog.h>
+#include <controls/globe/CalenhadGlobeWidget.h>
 #include <controls/globe/CalenhadStatsPanel.h>
+#include <controls/globe/CalenhadGlobeDialog.h>
+#include <mapping/CalenhadMapWidget.h>
 #include "nodeedit/Connection.h"
 #include "../nodeedit/CalenhadView.h"
-#include "../mapping/CalenhadMapWidget.h"
+#include "mapping/CalenhadMapWidget.h"
 #include "../nodeedit/CalenhadController.h"
+#include "../icosphere/icosphere.h"
 
-using namespace icosphere;
-using namespace calenhad::qmodule;
+using namespace calenhad::icosphere;
+using namespace calenhad::module;
 using namespace calenhad::nodeedit;
 using namespace calenhad::controls;
 using namespace calenhad::controls::globe;
@@ -34,11 +37,13 @@ using namespace calenhad::expressions;
 
 int Module::seed = 0;
 
-Module::Module (const QString& nodeType, const bool& suppressRender, QWidget* parent) : Node (nodeType, parent),
+Module::Module (const QString& nodeType, QWidget* parent) : Node (nodeType, parent),
                                                             _globe (nullptr),
                                                             _shownParameter (QString::null),
-                                                            _suppressRender (suppressRender),
-                                                             _connectMenu (new QMenu()),
+                                                            _suppressRender (false),
+                                                            _connectMenu (new QMenu()),
+                                                            _preview (nullptr),
+                                                            _vertexBuffer (nullptr),
                                                             _stats (nullptr)   {
     _legend = CalenhadServices::legends() -> defaultLegend();
     initialise();
@@ -47,6 +52,7 @@ Module::Module (const QString& nodeType, const bool& suppressRender, QWidget* pa
 
 Module::~Module () {
     _suppressRender = true;
+    if (_preview) { delete _preview; }
     if (_globe) { delete _globe; }
     if (_stats) { delete _stats; }
     if (_connectMenu) { delete _connectMenu; }
@@ -73,15 +79,14 @@ void Module::showGlobe() {
             _globe = new CalenhadGlobeDialog (this, this);
             _globe -> initialise ();
             _globe -> resize (640, 320);
-            connect (_globe -> globe(), &CalenhadMapWidget::rendered, this, &Module::rendered);
         }
         _globe -> show();
     }
 }
 
 void Module::setupPreview() {
-    _preview = new CalenhadMapWidget (this);
-    _preview->setSource (this);
+    _preview = new CalenhadMapWidget (RenderMode::RenderModePreview, this);
+    _preview -> setSource (this);
     _previewIndex = addPanel (tr ("Preview"), _preview);
     _stats = new QDialog (this);
 
@@ -94,11 +99,11 @@ void Module::setupPreview() {
     _stats -> setWindowFlags (Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowStaysOnTopHint | Qt::WindowCloseButtonHint | Qt::WindowContextHelpButtonHint);
     _stats -> setMinimumSize (400, 400);
     _stats -> move (_dialog->pos().x() + 400, _dialog->pos().y() + 300);
-    connect (_preview, &CalenhadMapWidget::rendered, _statsPanel, &CalenhadStatsPanel::refresh);
+    connect (_preview, &AbstractMapWidget::rendered, _statsPanel, &CalenhadStatsPanel::refresh);
     QAction* statsAction = new QAction (QIcon (":/appicons/controls/statistics.png"), "Statistics");
     connect (statsAction, &QAction::triggered, _stats, &QWidget::show);
     connect (_preview, &QWidget::customContextMenuRequested, this, &Module::showContextMenu);
-    connect (_preview, &CalenhadMapWidget::rendered, this, &Module::rendered);
+
     _contextMenu -> addAction (statsAction);
 }
 
@@ -143,7 +148,7 @@ void Module::serialize (QDomElement& element) {
     _element.setAttribute ("legend", _legend -> name());
 }
 
-void Module::rendered (const bool& success) {
+void Module::rendered() {
 
 }
 
@@ -226,13 +231,14 @@ void Module::parameterChanged() {
 void Module::invalidate() {
     if (! _suppressRender) {
         Node::invalidate ();
+
         // if this node needs recalculating or rerendering, so do any nodes that depend on it -
         // that is any nodes with an input connected to this one's output
         for (Module* dependant : dependants ()) {
             dependant->invalidate ();
         }
         if (_globe && _globe->isVisible ()) {
-            _globe->invalidate ();
+            _globe->update ();
         }
         if (_statsPanel) {
             _statsPanel->refresh ();
@@ -333,3 +339,11 @@ QColoredIcon* Module::icon () {
     return ((NodeBlock*) handle()) -> icon();
 }
 
+float* Module::vertexBuffer() {
+    if (! _vertexBuffer) {
+        _vertexBuffer = CalenhadServices::icosphere() -> vertexBuffer();
+    }
+
+    //_preview -> computeVertices (_vertexBuffer);
+    return _vertexBuffer;
+}

@@ -6,6 +6,7 @@
 #include <iostream>
 #include <QtCore/QFile>
 #include <QtCore/QCoreApplication>
+#include <utility>
 
 using namespace calenhad::preferences;
 
@@ -17,11 +18,11 @@ Preferences::Preferences() {
 }
 
 Preferences::~Preferences () {
-    if (_settings) { delete _settings; }
+    delete _settings;
 }
 
 void Preferences::setStylesheet (QString styleSheet) {
-    _styleSheet = styleSheet;
+    _styleSheet = std::move (styleSheet);
 }
 
 QString Preferences::styleSheet() {
@@ -35,6 +36,7 @@ void Preferences::loadSettings() {
     calenhad_default_planet_radius = _settings -> value ("calenhad/default_planet/radius", 6371000).toDouble (&ok);
     calenhad_colormap_buffersize = _settings -> value ("calenhad/colormap/buffersize", 2048).toUInt();
     calenhad_altitudemap_buffersize = _settings -> value ("calenhad/altitudemap/buffersize", 2048).toUInt();
+    calenhad_icosphere_depth = _settings -> value ("calenhad/icosphere/depth", 8).toUInt();
 
     // Styling for non-QGraphicsItem elements
     calenhad_stylesheet = _settings -> value ("calenhad/stylesheet", "/home/martin/.config/calenhad/darkorange.css").toString();
@@ -107,7 +109,7 @@ void Preferences::loadSettings() {
     calenhad_globe_zoom_max = _settings -> value ("calenhad/globe/zoom/max", 4.0).toDouble (&ok);
 
     // Dimensions
-    calenhad_globe_inset_height = _settings -> value ("calenhad/globe/inset/height", 64).toUInt (&ok);
+    calenhad_globe_inset_height = _settings -> value ("calenhad/globe/inset/height", 128).toUInt (&ok);
     calenhad_globe_texture_height = _settings -> value ("calenhad/globe/texture/height", 1024).toUInt (&ok);
 
     // Scale bar
@@ -126,7 +128,6 @@ void Preferences::loadSettings() {
     calenhad_graticule_major_text_color = _settings -> value ("calenhad/graticule/major/text/color", "#FFFFFF").value<QColor>();
     calenhad_graticule_minor_text_size = _settings -> value ("calenhad/graticule/major/text/size", 8).toUInt();
     calenhad_graticule_minor_text_color = _settings -> value ("calenhad/graticule/major/text/color", "#00FFFF").value<QColor>();
-    calenhad_graticule_density = _settings -> value ("calenhad/graticule/density", 2).toUInt();
     calenhad_graticule_visible = _settings -> value ("calenhad/graticule/visible", true).toBool();
 
     // Other UI elements
@@ -177,6 +178,7 @@ void Preferences::loadSettings() {
     calenhad_module_icospheremap = _settings -> value ("calenhad/module/icospheremap", "icospheremap").toString();
     calenhad_module_altitudemap = _settings -> value ("calenhad/module/altitudemap", "altitudemap").toString();
     calenhad_module_raster = _settings -> value ("calenhad/module/raster", "raster").toString();
+    calenhad_module_raster_file = _settings -> value ("calenhad/module/rasterfile", "rasterfile").toString();
     calenhad_nodegroup = _settings -> value ("calenhad/nodegroup", "nodegroup").toString();
 
 
@@ -305,12 +307,14 @@ void Preferences::saveSettings() {
     _settings -> setValue ("calenhad/desktop/nodegroup/height/default", calenhad_desktop_nodegroup_height_default);
     _settings -> setValue ("calenhad/desktop/nodegroup/width/default", calenhad_desktop_nodegroup_width_default);
     _settings -> setValue ("calenhad/model/extent", calenhad_model_extent);
+    _settings -> setValue ("calenhad/icosphere/depth", calenhad_icosphere_depth);
 
     // Modules
 
     _settings -> setValue ("calenhad/module/icospheremap", calenhad_module_icospheremap);
     _settings -> setValue ("calenhad/module/altitudemap", calenhad_module_altitudemap);
     _settings -> setValue ("calenhad/module/raster", calenhad_module_raster);
+    _settings -> setValue ("calenhad/module/rasterfile", calenhad_module_raster_file);
     _settings -> setValue ("calenhad/nodegroup", calenhad_nodegroup);
 
 }

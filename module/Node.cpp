@@ -20,7 +20,7 @@
 #include "../actions/ChangeModuleCommand.h"
 #include "../preferences/PreferencesService.h"
 
-using namespace calenhad::qmodule;
+using namespace calenhad::module;
 using namespace calenhad::nodeedit;
 using namespace calenhad::controls;
 using namespace calenhad::pipeline;
@@ -41,7 +41,7 @@ Node::Node (const QString& nodeType, QWidget* parent) : QWidget (parent),
 }
 
 Node::~Node () {
-    if (_dialog) { delete _dialog; }
+
     if (_validator) { delete _validator; }
     if (_palette) { delete _palette; }
 
@@ -202,6 +202,7 @@ void Node::invalidate() {
 
 void Node::setModel (CalenhadModel* model) {
     _model = model;
+    //setParent (model -> views () [0]);
     connect (_model, &CalenhadModel::groupsUpdated, this, [=] () {
         _groupEdit -> clear();
         for (NodeGroup* group : _model -> nodeGroups()) {

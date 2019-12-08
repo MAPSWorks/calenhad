@@ -6,7 +6,7 @@
 #include "Calenhad.h"
 #include "CalenhadController.h"
 #include "../pipeline/CalenhadModel.h"
-#include "qmodule/NodeGroup.h"
+#include "module/NodeGroup.h"
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <CalenhadServices.h>
@@ -24,9 +24,7 @@ CalenhadView::CalenhadView (QWidget* parent) : QGraphicsView (parent) {
 
 }
 
-CalenhadView::~CalenhadView() {
-
-}
+CalenhadView::~CalenhadView() = default;
 
 void CalenhadView::setZoom (const qreal& z) {
     qreal factor = z / zoom;
@@ -61,12 +59,8 @@ void CalenhadView::dragEnterEvent (QDragEnterEvent *event) {
     }
 }
 
-void CalenhadView::dragLeaveEvent (QDragLeaveEvent *event) {
-
-}
-
 void CalenhadView::dragMoveEvent(QDragMoveEvent *event) {
-    QPointF pos = mapToScene (event -> pos());
+    //QPointF pos = mapToScene (event -> pos());
     if (event->mimeData()->hasFormat("application/x-dnditemdata")) {
         if (event -> source() == this) {
             event -> setDropAction(Qt::MoveAction);
@@ -108,7 +102,7 @@ void CalenhadView::wheelEvent (QWheelEvent* event) {
         emit zoomInRequested();
     } else {
         emit zoomOutRequested();
-    };
+    }
 }
 
 void CalenhadView::drawBackground(QPainter *painter, const QRectF &rect) {
@@ -175,4 +169,47 @@ void CalenhadView::setSnapToGrid (const bool& enabled) {
 
 bool CalenhadView::snapToGrid() {
     return CalenhadServices::preferences() -> calenhad_desktop_grid_snap;
+}
+
+void CalenhadView::setModel (CalenhadModel* model) {
+    setScene (model);
+    connect (model, &QGraphicsScene::changed, this, &CalenhadView::modelChanged);
+}
+
+
+// Whnever the model changes we resize the canvas to its new bounds so that the view pans appropriately.
+// This code comes from apalomer on StackOverflow 7 March 2019 (adapted for house style)
+// https://stackoverflow.com/questions/55007339/allow-qgraphicsview-to-move-outside-scene
+
+void CalenhadView::modelChanged() {
+
+    // Widget viewport recangle
+    QRectF rectInScene (mapToScene (-20, -20), mapToScene (rect().bottomRight() + QPoint(20, 20)));
+
+    // Copy the new size from the old one
+    QPointF newTopLeft (sceneRect().topLeft());
+    QPointF newBottomRight (sceneRect().bottomRight());
+
+    // Check that the scene has a bigger limit in the top side
+    if (sceneRect().top() > rectInScene.top()) {
+        newTopLeft.setY (rectInScene.top());
+    }
+
+    // Check that the scene has a bigger limit in the bottom side
+    if (sceneRect().bottom() < rectInScene.bottom()) {
+        newBottomRight.setY (rectInScene.bottom());
+    }
+
+    // Check that the scene has a bigger limit in the left side
+    if (sceneRect().left() > rectInScene.left()) {
+        newTopLeft.setX (rectInScene.left());
+    }
+
+    // Check that the scene has a bigger limit in the right side
+    if (sceneRect().right() < rectInScene.right()) {
+        newBottomRight.setX (rectInScene.right());
+    }
+
+    // Set new scene size
+    setSceneRect (QRectF(newTopLeft, newBottomRight));
 }
